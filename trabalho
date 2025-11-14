@@ -1,0 +1,204 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <stdbool.h>
+
+// 1. Definição da Estrutura da Peça
+typedef struct {
+    char nome; // Tipo da peça ('I', 'O', 'T', 'L', etc.)
+    int id;    // Identificador único da peça
+} Peca;
+
+// 2. Definição da Estrutura da Fila
+#define TAMANHO_MAXIMO 5
+typedef struct {
+    Peca pecas[TAMANHO_MAXIMO];
+    int frente; // Índice do primeiro elemento
+    int fim;    // Índice da próxima posição livre
+    int count;  // Número atual de elementos na fila
+} FilaPecas;
+
+// Variável global para garantir IDs únicos para as peças
+static int proximo_id_peca = 0;
+
+// ----------------------------------------------------
+// Funções de Suporte (Gerar Peça)
+// ----------------------------------------------------
+
+// Gera uma nova peça com tipo aleatório e ID único
+Peca gerarPeca() {
+    Peca novaPeca;
+    
+    // Tipos de peças disponíveis no Tetris Stack
+    char tipos[] = {'I', 'O', 'T', 'L', 'J', 'S', 'Z'};
+    int numTipos = sizeof(tipos) / sizeof(tipos[0]);
+    
+    // Seleciona um tipo aleatório
+    novaPeca.nome = tipos[rand() % numTipos]; 
+    
+    // Atribui o ID único e incrementa para a próxima peça
+    novaPeca.id = proximo_id_peca++;
+    
+    return novaPeca;
+}
+
+// ----------------------------------------------------
+// Funções de Fila
+// ----------------------------------------------------
+
+// Inicializa a fila, preenchendo-a com peças iniciais
+void inicializarFila(FilaPecas *fila) {
+    fila->frente = 0;
+    fila->fim = 0;
+    fila->count = 0;
+    
+    // Preenche a fila inicial com 5 peças
+    for (int i = 0; i < TAMANHO_MAXIMO; i++) {
+        Peca novaPeca = gerarPeca();
+        fila->pecas[fila->fim] = novaPeca;
+        fila->fim = (fila->fim + 1) % TAMANHO_MAXIMO;
+        fila->count++;
+    }
+    
+    printf("✅ Fila inicializada com %d peças.\n", fila->count);
+}
+
+// Verifica se a fila está vazia
+bool filaVazia(FilaPecas *fila) {
+    return fila->count == 0;
+}
+
+// Verifica se a fila está cheia
+bool filaCheia(FilaPecas *fila) {
+    return fila->count == TAMANHO_MAXIMO;
+}
+
+// ----------------------------------------------------
+// Ação 2: Inserir nova peça ao final da fila (enqueue)
+// ----------------------------------------------------
+void enqueue(FilaPecas *fila) {
+    if (filaCheia(fila)) {
+        printf("❌ ERRO: A fila de peças futuras está cheia (%d/%d). Não é possível adicionar mais peças.\n", fila->count, TAMANHO_MAXIMO);
+        return;
+    }
+    
+    Peca novaPeca = gerarPeca();
+    
+    // Insere a nova peça na posição 'fim'
+    fila->pecas[fila->fim] = novaPeca;
+    
+    // Atualiza o índice 'fim' (circular)
+    fila->fim = (fila->fim + 1) % TAMANHO_MAXIMO;
+    fila->count++;
+    
+    printf("➕ PEÇA INSERIDA: [%c %d] adicionada ao final da fila.\n", novaPeca.nome, novaPeca.id);
+}
+
+// ----------------------------------------------------
+// Ação 1: Jogar uma peça (dequeue)
+// ----------------------------------------------------
+Peca dequeue(FilaPecas *fila) {
+    Peca pecaRemovida = {'\0', -1}; // Peça nula para erro
+    
+    if (filaVazia(fila)) {
+        printf("❌ ERRO: A fila está vazia! Não há peças para jogar.\n");
+        return pecaRemovida;
+    }
+    
+    // Pega a peça na posição 'frente'
+    pecaRemovida = fila->pecas[fila->frente];
+    
+    // Move o índice 'frente' para a próxima posição (circular)
+    fila->frente = (fila->frente + 1) % TAMANHO_MAXIMO;
+    fila->count--;
+    
+    printf("➖ PEÇA JOGADA: Peça [%c %d] removida da frente da fila.\n", pecaRemovida.nome, pecaRemovida.id);
+    
+    // Após jogar uma peça, o jogo adiciona automaticamente uma nova (troca)
+    printf("🔄 Ação de Troca: Fila reabastecida automaticamente.\n");
+    enqueue(fila);
+    
+    return pecaRemovida;
+}
+
+// ----------------------------------------------------
+// Ação 3: Exibir o estado atual da fila
+// ----------------------------------------------------
+void exibirFila(FilaPecas *fila) {
+    printf("\n--- Confirme seu estado ---\n");
+    
+    if (filaVazia(fila)) {
+        printf("Fila de peças: [VAZIA]\n");
+        return;
+    }
+    
+    printf("Fila de peças:");
+    
+    int i = fila->frente;
+    int elementos_exibidos = 0;
+    
+    // Percorre a fila de forma circular
+    while (elementos_exibidos < fila->count) {
+        printf(" [%c %d]", fila->pecas[i].nome, fila->pecas[i].id);
+        i = (i + 1) % TAMANHO_MAXIMO;
+        elementos_exibidos++;
+    }
+    
+    printf("\nTotal de peças: %d/%d (Frente: %d, Fim: %d)\n", 
+           fila->count, TAMANHO_MAXIMO, fila->frente, fila->fim);
+}
+
+// ----------------------------------------------------
+// Função Principal
+// ----------------------------------------------------
+int main() {
+    // Inicializa a semente do gerador de números aleatórios
+    // Isso é importante para que as peças geradas sejam diferentes a cada execução.
+    srand(time(NULL));
+    
+    FilaPecas fila;
+    inicializarFila(&fila);
+    
+    int opcao;
+    
+    do {
+        exibirFila(&fila);
+        
+        printf("\nOpções de ação:\n");
+        printf("Código\tAção\n");
+        printf("1\tJogar peça (dequeue)\n");
+        printf("2\tInserir nova peça (enqueue)\n");
+        printf("0\tSair\n");
+        
+        printf("Escolha uma ação: ");
+        if (scanf("%d", &opcao) != 1) {
+            // Limpa o buffer de entrada em caso de erro (ex: usuário digita letra)
+            while (getchar() != '\n');
+            opcao = -1; // Força uma opção inválida
+        }
+        
+        printf("\n");
+        
+        switch (opcao) {
+            case 1:
+                // Simula o ciclo: joga a peça da frente e adiciona uma nova
+                dequeue(&fila); 
+                break;
+            case 2:
+                // Adiciona uma nova peça manualmente (apenas se a fila não estiver cheia)
+                enqueue(&fila);
+                break;
+            case 0:
+                printf("✅ Saindo do simulador Tetris Stack. Fim do trabalho.\n");
+                break;
+            default:
+                printf("❌ Opção inválida. Por favor, digite 1, 2 ou 0.\n");
+                break;
+        }
+        
+        printf("\n----------------------------------------------------\n");
+        
+    } while (opcao != 0);
+    
+    return 0;
+}
